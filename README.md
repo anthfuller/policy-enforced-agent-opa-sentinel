@@ -1,201 +1,374 @@
-# Sentinel Policy-Enforced ReAct Agent (Demo)
+# Policy-Enforced AI Agent for Microsoft Sentinel  
+**ReAct + Open Policy Agent (OPA) + Code-Based PEP + Audit Telemetry**
 
 ## Overview
+
+This repository demonstrates a **policy-enforced AI agent pattern** for Microsoft Sentinel.
+
+The main idea is straightforward:
+
+> **LLM-generated KQL is untrusted and must be externally governed before execution.**
+
+Instead of allowing the model to directly query security data, this prototype places a **code-based Policy Enforcement Point (PEP)** between the agent and the execution layer. That PEP sends execution context to an external **Policy Decision Point (PDP)** implemented with **Open Policy Agent (OPA)**. Only approved queries are allowed to reach Microsoft Sentinel / Log Analytics.
+
+This design shows a practical security pattern for AI-assisted security operations:
+
+- the **LLM generates** investigative KQL
+- the **PEP intercepts and mediates** execution
+- the **PDP evaluates policy**
+- **Sentinel executes only approved queries**
+- **audit and telemetry** record what happened
+
+---
+
+## What This Repository Demonstrates
+
+This prototype is meant to show a control pattern, not just an architecture concept.
+
+It demonstrates that:
+
+- **LLM output is not a trust boundary**
+- generated KQL should be treated as **untrusted output**
+- **policy must live outside the model**
+- tool use should be **mediated, evaluated, and auditable**
+- security controls should govern **execution**, not just prompting
+
+---
+
+## Architecture
+
+```text
+User Prompt / External Content
+           ↓
+     ReAct LLM Agent
+           ↓
+   Code-Based PEP
+           ↓
+      OPA as PDP
+           ↓
+Microsoft Sentinel / Log Analytics
+           ↓
+    Audit + Telemetry
+```
+
+### Control Model
+
+- **LLM Agent**: proposes KQL based on the investigation goal
+- **PEP**: intercepts every tool request before execution
+- **PDP (OPA)**: evaluates the request and returns **ALLOW** or **DENY**
+- **Sentinel**: executes only policy-approved KQL
+- **Telemetry / Audit**: captures decisions, tool usage, and outcomes
+
+---
 
 ## Repository Structure
 
 ```text
-sentinel-policy-enforced-evidence-main/
+policy-enforced-ai-agent-react-opa-sentinel/
 ├── app/
 │   ├── agents/
-│   │   └── react/
-│   │       └── react_agent.py
+│   │   ├── react/
+│   │   │   └── react_agent.py
+│   │   └── soc/
+│   │       └── react_soc_agent.py
 │   ├── llm/
 │   │   └── azure_openai_client.py
 │   ├── mcp/
 │   │   ├── executor.py
 │   │   └── tools.py
+│   ├── orchestrator/
+│   │   ├── __init__.py
+│   │   └── orchestrator.py
 │   ├── pdp/
 │   │   └── pdp.py
 │   └── telemetry/
 │       ├── audit.py
 │       └── logger.py
-├── contracts/
-│   ├── tables_contract.json
-│   └── tools_contract.json
-├── runs/
-├── telemetry/
-│   └── audit_log.jsonl
 ├── main.py
 ├── README.md
-└── requirements.txt
-
-This project demonstrates a **policy-governed AI agent** for Microsoft Sentinel.
-
-It proves that:
-
-> **LLM-generated queries are untrusted and must be governed by external policy before execution.**
-
-## Architecture
-
-```text
-User Prompt
-   ↓
-ReAct Agent (LLM)
-   ↓
-PEP (executor.py)
-   ↓
-PDP (OPA)
-   ↓
-Microsoft Sentinel (KQL)
-   ↓
-Audit Logs
+├── LICENSE
+└── supporting files/directories as applicable
 ```
+
+---
 
 ## Key Components
 
-### ReAct Agent
-- Generates KQL queries dynamically using Azure OpenAI
-- Can adapt strategy across runs
+### `app/agents/react/react_agent.py`
+Implements the autonomous ReAct loop.
 
-### PEP (Policy Enforcement Point)
-- Implemented in `executor.py`
-- Intercepts all tool calls
-- Sends context to policy engine
+Key characteristics:
+- forces at least one tool attempt before finalization
+- treats model output as untrusted
+- records thought/final events to audit telemetry
+- supports iterative `Thought -> Action -> Observation -> Final` behavior
 
-### PDP (Policy Decision Point)
-- Implemented using **Open Policy Agent (OPA)**
-- Evaluates:
-  - Table access
-  - Query safety (for example, required `TimeGenerated` filter)
-  - Limits
+### `app/agents/soc/react_soc_agent.py`
+Wraps the ReAct pattern for a SOC investigation scenario.
 
-### Microsoft Sentinel
-- Executes KQL queries only if policy allows
+It applies:
+- Sentinel-focused prompting
+- bounded table access expectations
+- time-bounded query requirements
+- evidence-oriented output for analyst use
 
-### Telemetry
-- Logs all decisions (`ALLOW` / `DENY`)
-- Provides audit trail
+### `app/llm/azure_openai_client.py`
+Creates the Azure OpenAI client and enforces JSON-formatted model responses.
 
-## Alignment to F7-LAS (Conceptual)
+### `app/mcp/executor.py`
+Acts as the effective **Policy Enforcement Point (PEP)**.
 
-This demo aligns to key principles from the F7-LAS model:
+Responsibilities include:
+- intercepting tool execution requests
+- deriving table/query context
+- ensuring limits are applied
+- calling the PDP for allow/deny evaluation
+- executing KQL only when policy allows
+- writing audit events for both denied and executed actions
 
-- **Layer 4 (Tool Mediation)**  
-  The agent cannot directly execute queries. All tool calls are mediated.
+### `app/mcp/tools.py`
+Builds tool-driven KQL from contract definitions.
 
-- **Layer 5 (Policy Enforcement - PDP/PEP)**  
-  Open Policy Agent (OPA) acts as the Policy Decision Point (PDP).  
-  The executor functions as a Policy Enforcement Point (PEP).
+This module expects supporting contract files, including a tool contract JSON file.
 
-- **Layer 7 (Telemetry & Audit)**  
-  All actions, decisions, and outcomes are logged for traceability.
+### `app/pdp/pdp.py`
+Acts as the **Policy Decision Point (PDP)** by sending evaluation requests to OPA.
 
-This implementation focuses on **enforcement and control**, not model intelligence.
+It returns:
+- `ALLOW` when policy approves the action
+- `DENY` when policy blocks the action
+- `DENY` on OPA failure, which is the safer default
 
-## What This Demonstrates
+### `app/telemetry/audit.py`
+Writes structured audit records to a JSONL audit log.
 
-- LLMs do **not inherently follow security constraints**
-- Policies must be enforced **outside the model**
-- Queries can be:
-  - Generated dynamically
-  - Evaluated consistently
-  - Allowed or denied deterministically
+### `app/telemetry/logger.py`
+Emits structured telemetry/logging events for runtime visibility.
 
-## Prerequisites
+### `app/orchestrator/orchestrator.py`
+Contains a broader orchestration pattern for planning, evidence gathering, validation, and correlation.
 
-- Python 3.10+
-- Azure OpenAI deployment
-- Microsoft Sentinel workspace
-- OPA installed
+---
 
-## Environment Variables
+## Security Pattern
 
-Set the following:
+This repository centers on a simple but important rule:
 
-```bash
-AZURE_OPENAI_ENDPOINT=<your-endpoint>
-AZURE_OPENAI_API_KEY=<your-key>
-AZURE_OPENAI_DEPLOYMENT=<deployment-name>
-LOGS_WORKSPACE_ID=<sentinel-workspace-id>
-```
+> **The model can propose. The system decides.**
 
-## How to Run
+That separation matters because prompt instructions alone are not enforcement.
 
-### 1. Start OPA (PDP)
+A useful AI security pattern is:
 
-```bash
-cd C:\opa
-opa run --server policy.rego
-```
+1. Let the model generate candidate actions or queries
+2. Treat those outputs as untrusted
+3. Intercept every execution attempt
+4. Evaluate policy externally
+5. Allow only constrained, auditable actions
 
-OPA will listen on:
+---
 
-```text
-http://localhost:8181
-```
+## Example Enforcement Logic
 
-### 2. Run the Agent
-
-```bash
-cd C:\Users\Anthony\Downloads\sentinel-policy-enforced-evidence-main
-python main.py
-```
-
-## Expected Behavior
-
-- Agent generates KQL queries
-- PEP intercepts requests
-- PDP evaluates policy
-- Queries are:
-  - **Allowed** if compliant
-  - **Denied** if unsafe
-
-## Example Policy Enforcement
-
-### DENY (no time filter)
-
+### Unsafe Query Example
 ```kql
 SigninLogs
 | summarize count()
 ```
 
-### ALLOW (time bounded)
+Why this is unsafe:
+- no bounded time filter
+- can become overly broad depending on table size
 
+### Safer Query Example
 ```kql
 SigninLogs
 | where TimeGenerated > ago(7d)
+| take 100
 ```
 
-## Security Model
+Why this is safer:
+- bounded by time
+- bounded by result size
+- easier to evaluate against policy
 
-| Component | Responsibility |
-|----------|----------------|
-| LLM | Generate queries |
-| PEP | Enforce execution control |
-| PDP (OPA) | Decide allow/deny |
-| Sentinel | Execute only approved queries |
+---
 
-## Key Insight
+## Alignment to F7-LAS Concepts
 
-> **The model is not trusted. The system enforces trust.**
+This prototype aligns with several core control ideas:
 
-## Future Enhancements
+### Layer 4 — Tool Mediation
+The model does not directly query Sentinel. Tool use is mediated by code.
 
-- Identity-aware policies (Entra ID integration)
-- Field-level redaction
-- Tool-level authorization
-- AI Gateway integration
-- Advanced threat scenarios
+### Layer 5 — External Policy Enforcement
+OPA acts as an external decision point. Policy is outside the model.
+
+### Layer 7 — Telemetry and Audit
+Allow/deny decisions and execution outcomes are logged for traceability.
+
+This repository is focused on **control, mediation, and observability**, not on claiming the model itself is secure.
+
+---
+
+## Prerequisites
+
+Typical prerequisites include:
+
+- Python 3.10+
+- Azure OpenAI deployment
+- Microsoft Sentinel / Log Analytics workspace
+- Open Policy Agent (OPA)
+- Azure identity and monitor query dependencies
+
+---
+
+## Environment Variables
+
+Set the required Azure OpenAI and Sentinel variables before running:
+
+```bash
+AZURE_OPENAI_ENDPOINT=<your-endpoint>
+AZURE_OPENAI_API_KEY=<your-api-key>
+AZURE_OPENAI_API_VERSION=2024-05-01-preview
+AZURE_OPENAI_DEPLOYMENT=<deployment-name>
+LOGS_WORKSPACE_ID=<workspace-id>
+```
+
+Depending on your environment, equivalent workspace variable names may also be supported by the code.
+
+---
+
+## How to Run
+
+### 1. Start OPA (PDP)
+OPA runs locally on the laptop for this demo.
+
+```bash
+cd C:\opa
+opa version
+opa run --server policy.rego
+```
+
+Expected behavior:
+
+```text
+Listening on localhost:8181
+```
+
+If your policy entrypoint is configured as shown in the code, PDP evaluation is expected at:
+
+```text
+http://localhost:8181/v1/data/sentinel/allow
+```
+
+### 2. Run the Agent
+
+```bash
+cd C:\Users\Anthony\Downloads\policy-enforced-ai-agent-react-opa-sentinel
+python main.py
+```
+
+### What the Demo Does
+
+- ReAct agent generates KQL
+- PEP (`executor.py`) intercepts the request
+- PDP (OPA) evaluates the request
+- `ALLOW` → Sentinel query runs
+- `DENY` → blocked and audited
+
+### Optional Demo Clarity
+For a cleaner live demo, you can show both outcomes:
+
+- one compliant KQL path that is allowed
+- one unsafe KQL path that is denied
+- the resulting audit / telemetry output
+
+---
+
+## Expected Runtime Behavior
+
+A normal run should look like this:
+
+1. user request is sent to the ReAct agent
+2. agent proposes a KQL tool action
+3. executor intercepts the request
+4. context is sent to OPA
+5. OPA returns **ALLOW** or **DENY**
+6. approved queries execute against Sentinel
+7. telemetry and audit logs capture the decision and outcome
+8. the agent returns a final result based on observations
+
+---
+
+## Current State of the Repository
+
+This repository is best described as a **working prototype demonstrating an external policy-enforcement pattern**.
+
+It already shows the key security control idea well:
+- ReAct-style generation
+- execution mediation
+- external policy decisioning
+- Sentinel query path
+- telemetry and audit logging
+
+At the same time, some supporting assets may still need alignment depending on the version of the repo, such as:
+- policy files
+- contract files
+- runtime folders
+- any older orchestration imports or modules
+
+That means this repo should be presented honestly as a **prototype demonstrating an enforcement pattern**, not as a finished production platform.
+
+---
+
+## Recommended Next Improvements
+
+To make the repository stronger for technical reviewers, consider adding or tightening:
+
+- explicit `requirements.txt`
+- included `contracts/` assets
+- included `policy/` files
+- a minimal runnable end-to-end demo scenario
+- one blocked KQL example and one allowed KQL example with sample output
+- a short architecture image that precisely labels:
+  - LLM Agent
+  - PEP
+  - PDP
+  - Sentinel
+  - Audit/Telemetry
+
+---
+
+## Why This Matters
+
+Many AI security discussions stop at prompting, guardrails, or model behavior.
+
+This repository focuses on something more operational:
+
+> **external enforcement of model-generated actions**
+
+That matters because when AI starts touching security data, detections, or downstream tools, the real control boundary should be outside the model.
+
+---
 
 ## Disclaimer
 
-This is a **demo architecture**, not a production system.
+This repository is a **prototype / demo implementation** intended to illustrate a security architecture pattern.
+
+It is **not** a production-ready security product.
+
+---
 
 ## Summary
 
-This project shows a **real, working pattern** for:
+This project shows a practical pattern for:
 
-- Agentic AI
-- External policy enforcement
-- Secure query execution
+- AI-assisted security investigations
+- external policy enforcement
+- policy-mediated KQL execution
+- auditable control of LLM-generated actions
+
+In plain terms:
+
+> **The model is not the control plane. Policy is.**
