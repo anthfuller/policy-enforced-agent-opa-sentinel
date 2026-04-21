@@ -324,21 +324,13 @@ That means this repo should be presented honestly as a **prototype demonstrating
 
 ---
 
-## Recommended Next Improvements
+## Next Steps
 
-To make the repository stronger for technical reviewers, consider adding or tightening:
-
-- explicit `requirements.txt`
-- included `contracts/` assets
-- included `policy/` files
-- a minimal runnable end-to-end demo scenario
-- one blocked KQL example and one allowed KQL example with sample output
-- a short architecture image that precisely labels:
-  - LLM Agent
-  - PEP
-  - PDP
-  - Sentinel
-  - Audit/Telemetry
+Planned improvements include:
+- adding explicit dependency/setup documentation
+- including supporting contract and policy assets
+- expanding the runnable demo scenario
+- adding sample allow/deny query outcomes
 
 ---
 
