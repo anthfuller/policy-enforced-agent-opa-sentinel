@@ -267,7 +267,7 @@ http://localhost:8181/v1/data/sentinel/allow
 ### 2. Run the Agent
 
 ```bash
-cd C:\Users\Anthony\Downloads\policy-enforced-ai-agent-react-opa-sentinel
+cd C:\Users\account\Downloads\policy-enforced-ai-agent-react-opa-sentinel
 python main.py
 ```
 
