@@ -84,7 +84,9 @@ policy-enforced-ai-agent-react-opa-sentinel/
 │   └── telemetry/
 │       ├── audit.py
 │       └── logger.py
-|── images
+|── images/
+|      ├── policy-enforced-ai-agent-architecture.png
+|
 ├── main.py
 ├── README.md
 ├── LICENSE
