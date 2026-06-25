@@ -1,0 +1,38 @@
+{
+  "version": "0.1",
+  "description": "Tool contract examples for governed Microsoft Sentinel / Log Analytics queries.",
+  "tools": [
+    {
+      "name": "get_recent_security_incidents",
+      "action": "kql.read.SecurityIncident",
+      "table": "SecurityIncident",
+      "template": "SecurityIncident | where TimeGenerated > ago(7d) | take {limit}",
+      "default": { "limit": 50 },
+      "constraints": { "max_limit": 500 }
+    },
+    {
+      "name": "get_recent_security_alerts",
+      "action": "kql.read.SecurityAlert",
+      "table": "SecurityAlert",
+      "template": "SecurityAlert | where TimeGenerated > ago(7d) | take {limit}",
+      "default": { "limit": 50 },
+      "constraints": { "max_limit": 500 }
+    },
+    {
+      "name": "get_recent_signin_logs",
+      "action": "kql.read.SigninLogs",
+      "table": "SigninLogs",
+      "template": "SigninLogs | where TimeGenerated > ago(7d) | take {limit}",
+      "default": { "limit": 100 },
+      "constraints": { "max_limit": 500 }
+    },
+    {
+      "name": "get_recent_azure_activity",
+      "action": "kql.read.AzureActivity",
+      "table": "AzureActivity",
+      "template": "AzureActivity | where TimeGenerated > ago(7d) | take {limit}",
+      "default": { "limit": 100 },
+      "constraints": { "max_limit": 500 }
+    }
+  ]
+}
