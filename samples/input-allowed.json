@@ -1,0 +1,9 @@
+{
+  "input": {
+    "action": "kql.read.SigninLogs",
+    "table": "SigninLogs",
+    "query": "SigninLogs | where TimeGenerated > ago(7d) | take 100",
+    "limit": 100,
+    "has_time_filter": true
+  }
+}
