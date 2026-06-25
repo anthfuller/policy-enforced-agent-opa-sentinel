@@ -1,0 +1,9 @@
+{
+  "input": {
+    "action": "kql.read.SigninLogs",
+    "table": "SigninLogs",
+    "query": "SigninLogs | summarize count()",
+    "limit": 1000,
+    "has_time_filter": false
+  }
+}

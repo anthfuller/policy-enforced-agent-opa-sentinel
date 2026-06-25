@@ -1,0 +1,2 @@
+{"timestamp":"2026-06-25T00:00:00Z","run_id":"safe-demo-001","stage":"pdp_decision","data":{"action":"kql.read.SigninLogs","decision":"ALLOW","reason":"policy_allowed"}}
+{"timestamp":"2026-06-25T00:00:01Z","run_id":"safe-demo-001","stage":"pdp_decision","data":{"action":"kql.read.SigninLogs","decision":"DENY","reason":"policy_denied"}}

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import fnmatch
 import yaml
+import os
 import requests
 
 from app.telemetry.audit import write_audit
@@ -60,8 +61,9 @@ def evaluate(action: str, context: Dict[str, Any], run_id: str) -> Dict[str, str
     }
 
     try:
+        opa_url = os.environ.get("OPA_URL", "http://localhost:8181/v1/data/sentinel/allow")
         resp = requests.post(
-            "http://localhost:8181/v1/data/sentinel/allow",
+            opa_url,
             json=payload,
             timeout=3,
         )
